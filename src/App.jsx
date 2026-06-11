@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import Navigation from './pages/Navigation';
 import Hero from './pages/Hero';
+import Room from './pages/Room';
+import Gallery from './pages/Gallery';
 import StudentProfile from './pages/StudentProfile';
 import ClassProfile from './pages/ClassProfile';
 import Prestasi from './pages/Prestasi';
@@ -28,17 +31,138 @@ function disableScroll() {
   window.addEventListener('keydown', preventKeyScroll, { passive: false });
 }
 
-// Unlock scrolling
 function enableScroll() {
   window.removeEventListener('wheel', preventDefault);
   window.removeEventListener('touchmove', preventDefault);
   window.removeEventListener('keydown', preventKeyScroll);
 }
 
+function cleanupRouteState() {
+  enableScroll();
+  ScrollTrigger.getAll().forEach((trigger) => trigger.kill(true));
+  gsap.killTweensOf([
+    '.intro-blackout',
+    '.logo-circle',
+    '.logo-text-kiri',
+    '.logo-text-kanan',
+    '.nav-text',
+  ]);
+}
+
+function getRoute() {
+  const hash = window.location.hash;
+
+  if (hash.startsWith('#/about')) return 'about';
+  if (hash.startsWith('#/gallery')) return 'gallery';
+
+  return 'room';
+}
+
 function App() {
+  const [route, setRoute] = useState(getRoute);
+  const isRoomRoute = route === 'room';
+  const isAboutRoute = route === 'about';
+
+  useEffect(() => {
+    const updateRoute = () => {
+      cleanupRouteState();
+      setRoute(getRoute());
+    };
+
+    window.addEventListener('hashchange', updateRoute);
+    return () => window.removeEventListener('hashchange', updateRoute);
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    gsap.set('.intro-blackout', { opacity: route === 'room' ? 1 : 0, pointerEvents: route === 'room' ? 'auto' : 'none' });
+    gsap.set('.app-container', { backgroundColor: route === 'gallery' ? '#171512' : '#f3eadc' });
+  }, [route]);
+
   useGSAP(() => {
-    disableScroll();
+    if (isRoomRoute) {
+      disableScroll();
+      gsap.set('.intro-blackout', { opacity: 1, pointerEvents: 'auto' });
+
+      let splitLogoTextKiri = SplitText.create('.logo-text-kiri', {
+        type: 'words, chars',
+        wordsClass: 'overflow-hidden whitespace-nowrap'
+      });
+      let splitLogoTextKanan = SplitText.create('.logo-text-kanan', {
+        type: 'words, chars',
+        wordsClass: 'overflow-hidden whitespace-nowrap'
+      });
+
+      let introTl = gsap.timeline();
+
+      introTl.from('.logo-circle', {
+        delay: 0.3,
+        ease: 'power2.out',
+        duration: 0.6,
+        yPercent: 550,
+        rotate: 360
+      });
+      introTl.from(splitLogoTextKiri.chars, {
+        mask: 'words',
+        ease: 'expo.out',
+        yPercent: 100,
+        duration: 1,
+        rotate: 5,
+        stagger: .04
+      }, '<.5')
+      introTl.from(splitLogoTextKanan.chars, {
+        mask: 'words',
+        ease: 'expo.out',
+        yPercent: -100,
+        duration: 1,
+        rotate: 5,
+        stagger: .04
+      }, '<.3')
+      introTl.to('.logo-circle', {
+        yPercent: -10
+      }, '<')
+      introTl.to(splitLogoTextKiri.chars[1], {
+        rotate: 360,
+        ease: 'power1.out',
+      }, '<.3')
+      introTl.to(splitLogoTextKanan.chars[1], {
+        rotate: 360,
+        ease: 'power1.out',
+      }, '<.15')
+      introTl.from('.logo-container', {
+        scale: 2.5,
+        y: () => (window.innerHeight / 2) - 32,
+        duration: 1.2,
+        ease: 'power3.inOut'
+      }, '<.3');
+      introTl.from('.nav-text', {
+        duration: 1,
+        ease: 'power2.inOut',
+        opacity: 0
+      })
+      introTl.to('.intro-blackout', {
+        opacity: 0,
+        ease: 'power2.inOut',
+        pointerEvents: 'none',
+        duration: 1,
+        onComplete: () => enableScroll()
+      }, '<')
+
+      return () => enableScroll();
+    }
+
+    enableScroll();
+    gsap.set('.intro-blackout', { opacity: 0, pointerEvents: 'none' });
+
+    if (!isAboutRoute) {
+      return () => enableScroll();
+    }
+
     const students = document.querySelector('.students');
+    if (!students) {
+      return () => enableScroll();
+    }
+
     let studentsWidth = students.offsetWidth;
     let studentsAmountToScroll = studentsWidth - window.innerWidth;
     const studentItems = document.querySelectorAll('.student-item');
@@ -50,77 +174,14 @@ function App() {
       type: 'lines, words',
       linesClass: 'overflow-hidden whitespace-nowrap'
     });
-    let splitLogoTextKiri = SplitText.create('.logo-text-kiri', {
-      type: 'words, chars',
-      wordsClass: 'overflow-hidden whitespace-nowrap'
-    });
-    let splitLogoTextKanan = SplitText.create('.logo-text-kanan', {
-      type: 'words, chars',
-      wordsClass: 'overflow-hidden whitespace-nowrap'
-    });
     let splitPrestasiBigText = SplitText.create('.prestasi-big-text', {
       type: 'words, chars',
       wordsClass: 'overflow-hidden whitespace-nowrap',
       charsClass: 'char'
     })
 
-    let introTl = gsap.timeline();
-
-    introTl.from('.logo-circle', {
-      delay: 0.3,
-      ease: 'power2.out',
-      duration: 0.6,
-      yPercent: 550,
-      rotate: 360
-    });
-    introTl.from(splitLogoTextKiri.chars, {
-      mask: 'words',
-      ease: 'expo.out',
-      yPercent: 100,
-      duration: 1,
-      rotate: 5,
-      stagger: .04
-    }, '<.5')
-    introTl.from(splitLogoTextKanan.chars, {
-      mask: 'words',
-      ease: 'expo.out',
-      yPercent: -100,
-      duration: 1,
-      rotate: 5,
-      stagger: .04
-    }, '<.3')
-    introTl.to('.logo-circle', {
-      yPercent: -10
-    }, '<')
-    introTl.to(splitLogoTextKiri.chars[1], {
-      rotate: 360,
-      ease: 'power1.out',
-    }, '<.3')
-    introTl.to(splitLogoTextKanan.chars[1], {
-      rotate: 360,
-      ease: 'power1.out',
-    }, '<.15')
-    introTl.from('.logo-container', {
-      scale: 2.5,
-      y: () => (window.innerHeight / 2) - 32,
-      duration: 1.2,
-      ease: 'power3.inOut'
-    }, '<.3');
-    introTl.from('.nav-text', {
-      duration: 1,
-      ease: 'power2.inOut',
-      opacity: 0
-    })
-    introTl.to('.intro-blackout', {
-      opacity: 0,
-      ease: 'power2.inOut',
-      pointerEvents: 'none',
-      duration: 1,
-      onComplete: () => enableScroll()
-    }, '<')
-
     gsap.set(studentItems, { opacity: 0, scale: 0.7, top: 60 });
-    gsap.set('.app-container', { backgroundColor: '#ffede2' });
+    gsap.set('.app-container', { backgroundColor: '#f3eadc' });
     gsap.set('.instruction-text', { opacity: 0 });
     gsap.set('.bg-students', { opacity: 0, left: 1400 });
 
@@ -142,7 +203,7 @@ function App() {
     });
 
     gsap.to('.bg-students', {
-      x: -studentsAmountToScroll * 0.2, // lebih lambat dari container
+      x: -studentsAmountToScroll * 0.2,
       ease: 'none',
       scrollTrigger: {
         trigger: students,
@@ -154,7 +215,7 @@ function App() {
     });
 
     gsap.to('.app-container', {
-      backgroundColor: '#1b0000',
+      backgroundColor: '#171512',
       ease: 'none',
       scrollTrigger: {
         trigger: '.class-profile',
@@ -274,18 +335,46 @@ function App() {
         }
       })
     })
-  })
+
+    return () => enableScroll();
+  }, { dependencies: [route], revertOnUpdate: true })
 
   return (
     <div className='min-h-svh w-full overflow-x-hidden bg-light app-container'>
       <div className='w-full h-full bg-dark fixed inset-0 z-9 intro-blackout'></div>
-      <Navigation />
-      <Hero />
-      <StudentProfile data={data} />
-      <ClassProfile />
-      <Prestasi data={prestasiData} />
+      <Navigation currentRoute={route} />
+      {isRoomRoute ? (
+        <Room />
+      ) : route === 'gallery' ? (
+        <Gallery />
+      ) : (
+        <>
+          <Hero />
+          <StudentProfile data={data} />
+          <ClassProfile />
+          <Prestasi data={prestasiData} />
+        </>
+      )}
     </div>
   )
 }
 
 export default App
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
