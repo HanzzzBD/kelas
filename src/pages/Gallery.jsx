@@ -5,9 +5,40 @@ import students from '../data/students.json'
 
 gsap.registerPlugin(useGSAP)
 
-function getStudentImageUrl(name) {
-    const fileName = name.toLowerCase().split(' ').join('')
+const TILE_SIZE = 2200
+const TILE_OFFSETS = [-1, 0, 1].flatMap((x) => [-1, 0, 1].map((y) => ({ x, y })))
+const classPhotoLoaders = import.meta.glob('../assets/images/Class/xirpl2/*.{jpg,jpeg,png,webp}', {
+    import: 'default',
+    query: '?url',
+})
+
+function getStudentImageUrl(student) {
+    if (student.id === 0) {
+        return new URL('../assets/images/students/rima.webp', import.meta.url).href
+    }
+
+    const fileName = student.nama.toLowerCase().split(' ').join('')
     return new URL(`../assets/images/students/${fileName}.webp`, import.meta.url).href
+}
+
+function wrapMotion(motion) {
+    const halfTile = TILE_SIZE / 2
+
+    if (motion.tx > halfTile) {
+        motion.tx -= TILE_SIZE
+        motion.x -= TILE_SIZE
+    } else if (motion.tx < -halfTile) {
+        motion.tx += TILE_SIZE
+        motion.x += TILE_SIZE
+    }
+
+    if (motion.ty > halfTile) {
+        motion.ty -= TILE_SIZE
+        motion.y -= TILE_SIZE
+    } else if (motion.ty < -halfTile) {
+        motion.ty += TILE_SIZE
+        motion.y += TILE_SIZE
+    }
 }
 
 export default function Gallery() {
@@ -16,6 +47,7 @@ export default function Gallery() {
     const dragRef = useRef({ active: false, x: 0, y: 0 })
     const motionRef = useRef({ x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0 })
     const [selectedId, setSelectedId] = useState(null)
+    const [classPhotos, setClassPhotos] = useState([])
 
     useGSAP(() => {
         const intro = gsap.timeline({ defaults: { ease: 'power3.out' } })
@@ -42,24 +74,66 @@ export default function Gallery() {
     }, { scope: stageRef })
 
     const galleryItems = useMemo(() => {
-        const angleStep = Math.PI * (3 - Math.sqrt(5))
-
-        return students
+        const teacher = students.find((student) => student.id === 0)
+        const studentCards = students
             .filter((student) => student.id !== 0)
-            .map((student, index) => {
-                const ring = 180 + Math.sqrt(index + 1) * 118
-                const angle = index * angleStep
-                const size = 132 + (index % 5) * 18
+            .map((student) => ({
+                ...student,
+                type: 'student',
+                imageUrl: getStudentImageUrl(student),
+            }))
+        const classCards = classPhotos.map(({ imageUrl }, index) => ({
+            id: `class-${index}`,
+            nama: `Momen kelas ${index + 1}`,
+            nickname: 'XI RPL 2',
+            type: 'class',
+            imageUrl,
+        }))
 
-                return {
-                    ...student,
-                    imageUrl: getStudentImageUrl(student.nama),
-                    x: Math.cos(angle) * ring,
-                    y: Math.sin(angle) * ring,
-                    size,
-                    rotate: ((index % 7) - 3) * 2.5,
-                }
-            })
+        const angleStep = Math.PI * (3 - Math.sqrt(5))
+        const orbitItems = [...studentCards, ...classCards].map((item, index) => {
+            const ring = 230 + Math.sqrt(index + 1) * 102
+            const angle = index * angleStep
+            const isClassPhoto = item.type === 'class'
+            const size = isClassPhoto ? 190 + (index % 3) * 22 : 132 + (index % 5) * 18
+
+            return {
+                ...item,
+                x: Math.cos(angle) * ring,
+                y: Math.sin(angle) * ring,
+                size,
+                rotate: ((index % 7) - 3) * 2.5,
+            }
+        })
+
+        const centerItem = teacher ? {
+            ...teacher,
+            type: 'teacher',
+            imageUrl: getStudentImageUrl(teacher),
+            x: 0,
+            y: 0,
+            size: 260,
+            rotate: 0,
+        } : null
+
+        return centerItem ? [centerItem, ...orbitItems] : orbitItems
+    }, [classPhotos])
+
+    useEffect(() => {
+        let isMounted = true
+
+        Promise.all(
+            Object.entries(classPhotoLoaders).map(([path, loadPhoto], index) => (
+                loadPhoto().then((imageUrl) => ({ path, imageUrl, index }))
+            ))
+        ).then((photos) => {
+            if (!isMounted) return
+            setClassPhotos(photos.sort((a, b) => a.path.localeCompare(b.path)))
+        })
+
+        return () => {
+            isMounted = false
+        }
     }, [])
 
     useEffect(() => {
@@ -78,6 +152,7 @@ export default function Gallery() {
             motion.ty += motion.vy
             motion.vx *= 0.92
             motion.vy *= 0.92
+            wrapMotion(motion)
 
             field.style.transform = `translate3d(${motion.x}px, ${motion.y}px, 0)`
             animationFrame = requestAnimationFrame(update)
@@ -130,33 +205,48 @@ export default function Gallery() {
         }
     }, [])
 
-    const selectedStudent = galleryItems.find((student) => student.id === selectedId)
+    const selectedItem = galleryItems.find((item) => item.id === selectedId)
+
+    const handleCardClick = (item) => {
+        setSelectedId(item.id)
+    }
 
     return (
         <main ref={stageRef} className="gallery-page" aria-label="Student gallery">
             <div className="gallery-field" ref={fieldRef}>
-                {galleryItems.map((student) => (
-                    <button
-                        key={student.id}
-                        type="button"
-                        className="gallery-card"
+                {TILE_OFFSETS.map((tile) => (
+                    <div
+                        key={`${tile.x}-${tile.y}`}
+                        className="gallery-tile"
                         style={{
-                            '--gallery-x': `${student.x}px`,
-                            '--gallery-y': `${student.y}px`,
-                            '--gallery-size': `${student.size}px`,
-                            '--gallery-rotate': `${student.rotate}deg`,
-                            backgroundImage: `url(${student.imageUrl})`,
+                            '--tile-x': `${tile.x * TILE_SIZE}px`,
+                            '--tile-y': `${tile.y * TILE_SIZE}px`,
                         }}
-                        onClick={() => setSelectedId(student.id)}
-                        aria-label={student.nama}
                     >
-                        <span>{student.nickname}</span>
-                    </button>
+                        {galleryItems.map((item) => (
+                            <button
+                                key={`${tile.x}-${tile.y}-${item.id}`}
+                                type="button"
+                                className={`gallery-card gallery-card--${item.type}`}
+                                style={{
+                                    '--gallery-x': `${item.x}px`,
+                                    '--gallery-y': `${item.y}px`,
+                                    '--gallery-size': `${item.size}px`,
+                                    '--gallery-rotate': `${item.rotate}deg`,
+                                }}
+                                onClick={() => handleCardClick(item)}
+                                aria-label={item.nama}
+                            >
+                                <img src={item.imageUrl} alt="" draggable="false" loading={item.type === 'teacher' && tile.x === 0 && tile.y === 0 ? 'eager' : 'lazy'} />
+                                <span>{item.nickname}</span>
+                            </button>
+                        ))}
+                    </div>
                 ))}
             </div>
             <div className="gallery-meta" aria-live="polite">
                 <span>GALLERY</span>
-                <strong>{selectedStudent ? selectedStudent.nama : 'XI RPL 2'}</strong>
+                <strong>{selectedItem ? selectedItem.nama : 'XI RPL 2'}</strong>
             </div>
         </main>
     )

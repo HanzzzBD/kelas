@@ -91,6 +91,15 @@
     transform-style: preserve-3d;
 }
 
+.gallery-tile {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    transform: translate3d(var(--tile-x), var(--tile-y), 0);
+}
+
 .gallery-intro {
     position: fixed;
     left: clamp(1.25rem, 4vw, 3.5rem);
@@ -142,14 +151,44 @@
     left: 0;
     top: 0;
     width: var(--gallery-size);
-    aspect-ratio: 4 / 5;
     transform: translate3d(calc(var(--gallery-x) - 50%), calc(var(--gallery-y) - 50%), 0) rotate(var(--gallery-rotate));
     transform-origin: center;
     overflow: hidden;
-    background-size: cover;
-    background-position: center;
+    background: rgba(243, 234, 220, 0.08);
     box-shadow: 0 24px 70px rgba(12, 10, 8, 0.34);
     transition: transform 260ms ease, filter 260ms ease, box-shadow 260ms ease;
+}
+
+.gallery-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 310px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.gallery-card--teacher {
+    z-index: 2;
+    border: 2px solid rgba(216, 173, 104, 0.86);
+    box-shadow:
+        0 0 0 10px rgba(216, 173, 104, 0.08),
+        0 34px 96px rgba(12, 10, 8, 0.54);
+}
+
+.gallery-card--teacher::after {
+    background:
+        linear-gradient(to top, rgba(23, 21, 18, 0.76), rgba(23, 21, 18, 0.04) 62%),
+        radial-gradient(circle at 50% 18%, rgba(216, 173, 104, 0.18), transparent 42%);
+}
+
+.gallery-card--class span {
+    font-size: clamp(16px, 1.5vw, 22px);
+    letter-spacing: 0.02em;
+}
+
+.gallery-card--class img {
+    max-height: 240px;
 }
 
 .gallery-card::after {
